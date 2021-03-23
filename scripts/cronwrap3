@@ -1,0 +1,260 @@
+#!/usr/bin/env python
+
+"""
+    cronwrap
+    ~~~~~~~~~~~~~~
+
+    A cron job wrapper that wraps jobs and enables better error reporting and command timeouts.
+
+    Example of usage::
+        
+        #Will print out help
+        $ cronwrap -h
+
+        #Will send out a timeout alert to cron@my_domain.com:
+        $ cronwrap -c "sleep 2" -t "1s" -e cron@my_domain.com
+
+        #Will send out an error alert to cron@my_domain.com:
+        $ cronwrap -c "blah" -t "1s" -e cron@my_domain.com
+
+        #Will not send any reports:
+        $ cronwrap -c "ls" -e cron@my_domain.com
+
+        #Will send a successful report to cron@my_domain.com:
+        $ cronwrap -c "ls" -e cron@my_domain.com -v
+
+    :copyright: 2010 by Plurk
+    :license: BSD
+"""
+__VERSION__ = '1.4'
+
+import sys
+import re
+import os
+import argparse
+import tempfile
+import time
+import platform
+from datetime import datetime, timedelta
+
+
+# --- Handlers ----------------------------------------------
+def handle_args(sys_args):
+    """Handles commands that are parsed via argparse."""
+    if not sys_args.time:
+        sys_args.time = '1h'
+
+    if sys_args.verbose != False:
+        sys_args.verbose = True
+
+    if sys_args.cmd:
+        cmd = Command(sys_args.cmd)
+        if cmd.returncode != 0:
+            handle_error(sys_args, cmd)
+        elif is_time_exceeded(sys_args, cmd):
+            handle_timeout(sys_args, cmd)
+        else:
+            handle_success(sys_args, cmd)
+    elif sys_args.emails:
+        handle_test_email(sys_args)
+
+
+def handle_success(sys_args, cmd):
+    """Called if a command did finish successfully."""
+    out_str = render_email_template(
+        'CRONWRAP RAN COMMAND SUCCESSFULLY:',
+        sys_args,
+        cmd
+    )
+
+    if sys_args.verbose:
+        if sys_args.emails:
+            send_email(sys_args,
+                       sys_args.emails,
+                       'Host %s: cronwrap ran command successfully!' % platform.node().capitalize(),
+                       out_str)
+        else:
+            print(out_str)
+
+
+def handle_timeout(sys_args, cmd):
+    """Called if a command exceeds its running time."""
+    err_str = render_email_template(
+        "CRONWRAP DETECTED A TIMEOUT ON FOLLOWING COMMAND:",
+        sys_args,
+        cmd
+    )
+
+    if sys_args.emails:
+        send_email(sys_args,
+                   sys_args.emails,
+                   'Host %s: cronwrap detected a timeout!' % platform.node().capitalize(),
+                   err_str)
+    else:
+        print(err_str)
+
+
+def handle_error(sys_args, cmd):
+    """Called when a command did not finish successfully."""
+    err_str = render_email_template(
+        "CRONWRAP DETECTED FAILURE OR ERROR OUTPUT FOR THE COMMAND:",
+        sys_args,
+        cmd
+    )
+
+    if sys_args.emails:
+        send_email(sys_args,
+                   sys_args.emails,
+                   'Host %s: cronwrap detected a failure!' % platform.node().capitalize(),
+                   err_str)
+    else:
+        print(err_str)
+
+    sys.exit(-1)
+
+
+def render_email_template(title, sys_args, cmd):
+    result_str = []
+
+    result_str.append(title)
+    result_str.append('%s\n' % sys_args.cmd)
+
+    result_str.append('COMMAND STARTED:')
+    result_str.append('%s UTC\n' % (datetime.utcnow() - timedelta(seconds=int(cmd.run_time))))
+
+    result_str.append('COMMAND FINISHED:')
+    result_str.append('%s UTC\n' % datetime.utcnow())
+
+    result_str.append('COMMAND RAN FOR:')
+    hours = cmd.run_time / 60 / 60
+    if cmd.run_time < 60:
+        hours = 0
+    result_str.append('%d seconds (%.2f hours)\n' % (cmd.run_time, hours))
+
+    result_str.append("COMMAND'S TIMEOUT IS SET AT:")
+    result_str.append('%s\n' % sys_args.time)
+
+    result_str.append('RETURN CODE WAS:')
+    result_str.append('%s\n' % cmd.returncode)
+
+    result_str.append('ERROR OUTPUT:')
+    result_str.append('%s\n' % trim_if_needed(cmd.stderr))
+
+    result_str.append('STANDARD OUTPUT:')
+    result_str.append('%s' % trim_if_needed(cmd.stdout))
+
+    return '\n'.join(result_str)
+
+
+def handle_test_email(sys_args):
+    send_email(sys_args,
+               sys_args.emails,
+               'Host %s: cronwrap test mail' % platform.node().capitalize(),
+               'just a test mail, yo! :)')
+
+
+# --- Util ----------------------------------------------
+class Command:
+    """Runs a command, only works on Unix.
+
+       Example of usage::
+
+           cmd = Command('ls')
+           print cmd.stdout
+           print cmd.stderr
+           print cmd.returncode
+           print cmd.run_time
+    """
+
+    def __init__(self, command):
+        outfile = tempfile.mktemp()
+        errfile = tempfile.mktemp()
+
+        t_start = time.time()
+
+        self.returncode = os.system(f"( {command} ) > {outfile} 2> {errfile}") >> 8
+        self.run_time = time.time() - t_start
+        self.stdout = open(outfile, "r").read().strip()
+        self.stderr = open(errfile, "r").read().strip()
+
+        os.remove(outfile)
+        os.remove(errfile)
+
+
+def send_email(sys_args, emails, subject, message):
+    """Sends an email via `mail`."""
+    emails = emails.split(',')
+
+    err_report = tempfile.mktemp()
+    fp_err_report = open(err_report, "w")
+    fp_err_report.write(message)
+    fp_err_report.close()
+
+    try:
+        for email in emails:
+            cmd = Command('mail -s "%s" %s < %s' % \
+                          (subject.replace('"', "'"),
+                           email,
+                           err_report)
+                          )
+
+            if sys_args.verbose:
+                if cmd.returncode == 0:
+                    print('Sent an email to %s' % email)
+                else:
+                    print('Could not send an email to %s' % email)
+                    print(trim_if_needed(cmd.stderr))
+    finally:
+        os.remove(err_report)
+
+
+def is_time_exceeded(sys_args, cmd):
+    """Returns `True` if the command's run time has exceeded the maximum
+    run time specified in command arguments. Else `False  is returned."""
+    cmd_time = int(cmd.run_time)
+
+    # Parse sys_args.time
+    max_time = sys_args.time
+    sp = re.match("(\d+)([hms])", max_time).groups()
+    t_val, t_unit = int(sp[0]), sp[1]
+
+    # Convert time to seconds
+    if t_unit == 'h':
+        t_val = t_val * 60 * 60
+    elif t_unit == 'm':
+        t_val = t_val * 60
+
+    return cmd_time > t_val
+
+
+def trim_if_needed(txt, max_length=10000):
+    if len(txt) > max_length:
+        return '... START TRUNCATED...\n%s' % txt[-max_length:]
+    else:
+        return txt
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=(f"A Python3 cron job wrapper that wraps jobs and enables "
+                                                  f"better error reporting and command timeouts. " 
+                                                  f"Version {__VERSION__}"))
+
+    parser.add_argument('-c', '--cmd', help='Run a command. Could be `cronwrap -c "ls -la"`.')
+
+    parser.add_argument('-e', '--emails', help='Email following users if the command crashes or exceeds timeout. '
+                                               'Could be `cronwrap -e "johndoe@mail.com, marcy@mail.com"`. '
+                                               "Uses system's `mail` to send emails. "
+                                               "If no command (cmd) is set a test email is sent.")
+
+    parser.add_argument('-t', '--time', help='Set the maximum running time.'
+                                             'If this time is passed an alert email will be sent.'
+                                             "The command will keep running even if maximum running time is exceeded."
+                                             "The default is 1 hour `-t 1h`. "
+                                             "Possible values include: `-t 2h`,`-t 2m`, `-t 30s`."
+                        )
+
+    parser.add_argument('-v', '--verbose',
+                        nargs='?', default=False,
+                        help='Will send an email / print to stdout on successful run.')
+
+    handle_args(parser.parse_args())
