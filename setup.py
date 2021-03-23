@@ -5,15 +5,14 @@
 # the Free Software Foundation, either version 3 of the License, or (at
 # your option) any later version.
 
-import os
 from setuptools import setup
 
 setup(name='cronwrap3',
-      version='1.0',
+      version='1.0.2',
       author="Ed Henderson",
       # author_email="amix@amix.dk",
       author_email='ed@sharpertool.com',
-      url="https://sharpertool.com/cronwrap3/",
+      url="https://github.com/sharpertool/cronwrap3",
       classifiers=[
           "Development Status :: 5 - Production/Stable",
           "Intended Audience :: Developers",
@@ -27,12 +26,12 @@ setup(name='cronwrap3',
           'argparse>=1.1'
       ],
 
-      scripts=['scripts/cronwrap'],
+      scripts=['scripts/cronwrap3'],
       packages=[''],
       platforms=["Any"],
       license="BSD",
       keywords='cron wrapper crontab cronjob',
-      description="A cron job wrapper that wraps jobs and enables better error reporting and command timeouts.",
+      description="A Python3 cron job wrapper that wraps jobs and enables better error reporting and command timeouts.",
       long_description="""\
 Example
 -------
@@ -42,7 +41,7 @@ Basic example of usage::
     ##Will print out help
     $ cronwrap -h
 
-        usage: cronwrap [-h] [-c CMD] [-e EMAILS] [-t TIME] [-v [VERBOSE]]
+        usage: cronwrap3 [-h] [-c CMD] [-e EMAILS] [-t TIME] [-v [VERBOSE]]
 
         A cron job wrapper that wraps jobs and enables better error reporting and command timeouts.
 
