@@ -8,7 +8,7 @@
 from setuptools import setup
 
 setup(name='cronwrap3',
-      version='1.0.2',
+      version='1.1.0',
       author="Ed Henderson",
       # author_email="amix@amix.dk",
       author_email='ed@sharpertool.com',
@@ -18,13 +18,14 @@ setup(name='cronwrap3',
           "Intended Audience :: Developers",
           "License :: OSI Approved :: BSD License",
           "Operating System :: OS Independent",
-          "Programming Language :: Python",
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.9',
           "Topic :: Software Development :: Libraries :: Python Modules",
       ],
 
-      install_requires=[
-          'argparse>=1.1'
-      ],
+      install_requires=[],
 
       scripts=['scripts/cronwrap3'],
       packages=[''],
