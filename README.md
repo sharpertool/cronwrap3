@@ -26,5 +26,9 @@ $ cronwrap -c "ls" -e cron@my_domain.com
 ### Will send a successful report to cron@my_domain.com:
 $ cronwrap -c "ls" -e cron@my_domain.com -v
 
-# From the original repo
+## Release Notes
+
+### v1.2.0
+
+I removed the requirement for argparse, since that is part of python standard library now
 
