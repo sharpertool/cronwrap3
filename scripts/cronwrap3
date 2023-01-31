@@ -172,6 +172,7 @@ class Command:
 
         t_start = time.time()
 
+        os.putenv('PATH', os.path.expanduser(os.environ['PATH']))
         self.returncode = os.system(f"( {command} ) > {outfile} 2> {errfile}") >> 8
         self.run_time = time.time() - t_start
         self.stdout = open(outfile, "r").read().strip()
