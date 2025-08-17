@@ -215,7 +215,7 @@ def is_time_exceeded(sys_args, cmd):
 
     # Parse sys_args.time
     max_time = sys_args.time
-    sp = re.match("(\d+)([hms])", max_time).groups()
+    sp = re.match(r'(\d+)([hms])', max_time).groups()
     t_val, t_unit = int(sp[0]), sp[1]
 
     # Convert time to seconds
