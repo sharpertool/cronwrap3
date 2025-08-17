@@ -35,7 +35,7 @@ import argparse
 import tempfile
 import time
 import platform
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 
 # --- Handlers ----------------------------------------------
@@ -120,10 +120,10 @@ def render_email_template(title, sys_args, cmd):
     result_str.append('%s\n' % sys_args.cmd)
 
     result_str.append('COMMAND STARTED:')
-    result_str.append('%s UTC\n' % (datetime.utcnow() - timedelta(seconds=int(cmd.run_time))))
+    result_str.append('%s UTC\n' % (datetime.now(timezone.utc) - timedelta(seconds=int(cmd.run_time))))
 
     result_str.append('COMMAND FINISHED:')
-    result_str.append('%s UTC\n' % datetime.utcnow())
+    result_str.append('%s UTC\n' % datetime.now(timezone.utc))
 
     result_str.append('COMMAND RAN FOR:')
     hours = cmd.run_time / 60 / 60
